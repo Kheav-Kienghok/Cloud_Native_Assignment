@@ -5,56 +5,88 @@ const port = 3000;
 
 app.use(bodyParser.json());
 
-let users = [];
+const db = require('./dbConnect');
+
 
 // 1. Registration Service
 app.post("/register", (req, res) => {
-    const { username, password, email } = req.body;
-    if (!username || !password || !email) {
-        return res.status(400).json({ message: "All fields are required" });
+    const { studentId, name, email, password } = req.body;
+    const query = 'INSERT INTO students (studentId, name, email, password) VALUES (?, ?, ?, ?)';
+
+  db.query(query, [studentId, name, email, password], (err, result) => {
+    if (err) {
+      return res.status(400).json({ message: 'Registration failed', error: err.message });
     }
-    const id = users.length + 1;
-    users.push({ id, username, password, email });
-    res.status(201).json({ message: "User registered successfully", id });
+    res.status(201).json({ message: 'Student registered successfully', studentId });
+  });
 });
+
 
 // 2. Login Service
 app.post("/login", (req, res) => {
-    const { username, password } = req.body;
-    const user = users.find(u => u.username === username && u.password === password);
-    if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
-    }
-    res.json({ message: "Login successful", id: user.id });
-});
+    const { studentId, password } = req.body;
+    const query = 'SELECT * FROM students WHERE studentId = ? AND password = ?';
+  
+    db.query(query, [studentId, password], (err, results) => {
+      if (err) {
+        return res.status(500).json({ message: 'Login failed', error: err.message });
+      }
+      if (results.length === 0) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      res.status(200).json({ message: 'Login successful', student: results[0] });
+    });
+  });
+
 
 // 3. Search Service
-app.get("/search", (req, res) => {
-    const { username } = req.query;
-    const user = users.find(u => u.username === username);
-    if (!user) {
-        return res.status(404).json({ message: "User not found" });
+app.get("/search/:studentId", (req, res) => {
+  const { studentId } = req.params;
+  const query = 'SELECT * FROM students WHERE studentId = ?';
+
+  db.query(query, [studentId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ message: 'Search failed', error: err.message });
     }
-    res.json(user);
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    res.status(200).json({ message: 'Student found', student: results[0] });
+  });
 });
 
 // 4. Profile Update Service
-app.put("/update", (req, res) => {
-    const { username, email } = req.body;
-    let user = users.find(u => u.username === username);
-    if (!user) {
-        return res.status(404).json({ message: "User not found" });
-    }
-    user.email = email || user.email;
-    res.json({ message: "User updated successfully" });
-});
+app.put("/update/:studentId", (req, res) => {
+    const { studentId } = req.params;
+    const { name, email, password } = req.body;
+    const query = 'UPDATE students SET name = ?, email = ?, password = ? WHERE studentId = ?';
+  
+    db.query(query, [name, email, password, studentId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Update failed', error: err.message });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+      res.status(200).json({ message: 'Profile updated successfully' });
+    });
+  });
 
 // 5. Delete User Service
-app.delete("/delete", (req, res) => {
-    const { username } = req.body;
-    users = users.filter(u => u.username !== username);
-    res.json({ message: "User deleted successfully" });
-});
+app.delete("/delete/:studentId", (req, res) => {
+    const { studentId } = req.params;
+    const query = 'DELETE FROM students WHERE studentId = ?';
+  
+    db.query(query, [studentId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: 'Deletion failed', error: err.message });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Student not found' });
+      }
+      res.status(200).json({ message: 'Student deleted successfully' });
+    });
+  });
 
 // Start Server
 app.listen(port, () => {
